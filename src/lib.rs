@@ -103,6 +103,7 @@ enum ReadMode {
     Next,
     #[cfg(feature = "rand")]
     Random,
+    Specific(u64),
 }
 
 pub struct EasyReader<R> {
@@ -192,6 +193,13 @@ impl<R: Read + Seek> EasyReader<R> {
         self.read_line(ReadMode::Random)
     }
 
+    /// Read a specific line from the buffer, moving the current cursor to that position.
+    ///
+    /// Will build the index if not already build
+    pub fn specific_line(&mut self, line_index: u64) -> io::Result<Option<String>> {
+        self.read_line(ReadMode::Specific(line_index))
+    }
+
     fn read_line(&mut self, mode: ReadMode) -> io::Result<Option<String>> {
         match mode {
             ReadMode::Prev => {
@@ -249,6 +257,15 @@ impl<R: Read + Seek> EasyReader<R> {
                 } else {
                     self.current_start_line_offset =
                         rand::thread_rng().gen_range(0..self.file_size);
+                }
+            }
+            ReadMode::Specific(idx) => {
+                if self.indexed && (idx as usize) < self.offsets_index.len() {
+                    self.current_start_line_offset = self.offsets_index[idx as usize].0 as u64;
+                    self.current_end_line_offset = self.offsets_index[idx as usize].1 as u64;
+                    return self.read_line(ReadMode::Current);
+                } else {
+                    self.current_end_line_offset = self.current_start_line_offset;
                 }
             }
         }
